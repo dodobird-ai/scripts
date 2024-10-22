@@ -13,4 +13,4 @@ mkdir -p /etc/bash_completion.d/
 # Generate and save the completion script
 just --completions bash > /etc/bash_completion.d/just
 
-source /etc/bash_completion.d/just
+echo 'source /etc/bash_completion.d/just' >> ~/.bashrc
