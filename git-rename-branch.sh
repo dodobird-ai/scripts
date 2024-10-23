@@ -18,10 +18,23 @@ branch_exists() {
 is_default_branch() {
     local branch="$1"
     local default_branch
-    default_branch=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
-    local ret=$?
-    [ "$branch" = "$default_branch" ]
-    return $ret
+
+    # Try different methods to determine default branch
+    if git symbolic-ref refs/remotes/origin/HEAD >/dev/null 2>&1; then
+        default_branch=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
+    else
+        # Check common default branch names
+        for name in "main" "master" "prod"; do
+            if git show-ref --verify --quiet "refs/heads/$name"; then
+                default_branch="$name"
+                break
+            fi
+        done
+    fi
+
+    # If we still can't determine the default branch, assume it's not the default
+    [ -n "$default_branch" ] && [ "$branch" = "$default_branch" ]
+    return $?
 }
 
 # Check if we have exactly two arguments
