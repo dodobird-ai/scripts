@@ -14,26 +14,31 @@ branch_exists() {
     return $?
 }
 
+# Function to check if working directory is clean
+is_working_tree_clean() {
+    # Check for staged and unstaged changes
+    if ! git diff --quiet --exit-code || \
+       ! git diff --cached --quiet --exit-code
+    then
+        return 1
+    fi
+    return 0
+}
+
 # Function to check if branch is the default branch
 is_default_branch() {
     local branch="$1"
-    local default_branch
+    local remote_url
+    local repo_path
 
-    # Try different methods to determine default branch
-    if git symbolic-ref refs/remotes/origin/HEAD >/dev/null 2>&1; then
-        default_branch=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
-    else
-        # Check common default branch names
-        for name in "main" "master" "prod"; do
-            if git show-ref --verify --quiet "refs/heads/$name"; then
-                default_branch="$name"
-                break
-            fi
-        done
-    fi
+    # Get the remote URL and extract owner/repo
+    remote_url=$(git remote get-url origin)
+    repo_path=$(echo "$remote_url" | sed -n 's/.*github.com[:\/]\(.*\)\.git/\1/p')
 
-    # If we still can't determine the default branch, assume it's not the default
-    [ -n "$default_branch" ] && [ "$branch" = "$default_branch" ]
+    # Get default branch from GitHub API
+    default_branch=$(curl -s "https://api.github.com/repos/$repo_path" | grep -o '"default_branch": *"[^"]*"' | cut -d'"' -f4)
+
+    [ "$branch" = "$default_branch" ]
     return $?
 }
 
@@ -45,6 +50,12 @@ fi
 OLD_BRANCH="$1"
 NEW_BRANCH="$2"
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Check if working directory is clean
+if ! is_working_tree_clean; then
+    echo "Error: Working directory is not clean. Please commit or stash your changes first."
+    exit 1
+fi
 
 # Check if old branch exists
 if ! branch_exists "$OLD_BRANCH"; then
